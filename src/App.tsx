@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import TreeView from './TreeView'
+import PersonForm, { type PersonValues } from './PersonForm'
 import type { Person, Relation } from './types'
 
 export default function App() {
@@ -40,21 +41,32 @@ function Login() {
 }
 
 type Rel = 'first' | 'parent' | 'child' | 'partner' | 'sibling'
+type FormState = { mode: 'add'; rel: Rel } | { mode: 'edit' } | null
+
+const TITLES: Record<Rel, string> = {
+  first: 'Tambah orang pertama (Saya)', parent: 'Tambah orang tua', child: 'Tambah anak',
+  partner: 'Tambah pasangan', sibling: 'Tambah saudara',
+}
 
 function Main() {
   const [treeId, setTreeId] = useState<string>()
+  const [rootId, setRootId] = useState<string | null>(null)
   const [persons, setPersons] = useState<Person[]>([])
   const [rels, setRels] = useState<Relation[]>([])
   const [sel, setSel] = useState<string | null>(null)
+  const [form, setForm] = useState<FormState>(null)
+  const [recenter, setRecenter] = useState(0)
   const [msg, setMsg] = useState('')
 
   const load = useCallback(async (tid: string) => {
-    const [p, r] = await Promise.all([
-      supabase.from('persons').select('*').eq('tree_id', tid),
+    const [t, p, r] = await Promise.all([
+      supabase.from('trees').select('root_person_id').eq('id', tid).single(),
+      supabase.from('persons').select('*').eq('tree_id', tid).order('created_at'),
       supabase.from('relations').select('*').eq('tree_id', tid),
     ])
-    const err = p.error || r.error
+    const err = t.error || p.error || r.error
     if (err) { setMsg(err.message); return }
+    setRootId(t.data.root_person_id)
     setPersons(p.data as Person[])
     setRels(r.data as Relation[])
   }, [])
@@ -74,16 +86,25 @@ function Main() {
 
   const selected = persons.find((p) => p.id === sel)
 
-  const addPerson = async (rel: Rel) => {
-    if (!treeId) return
-    const parents = rels.filter((r) => r.type === 'parent_of' && r.b_id === sel)
-    if (rel === 'sibling' && !parents.length) { alert('Tambahkan orang tua dulu, agar saudara bisa dihubungkan.'); return }
-    const name = prompt('Nama lengkap:')
-    if (!name) return
-    const g = (prompt('Jenis kelamin (L/P, kosongkan jika belum diketahui):') || '').toUpperCase()
-    const p = await supabase.from('persons')
-      .insert({ tree_id: treeId, full_name: name, gender: g === 'L' || g === 'P' ? g : null })
-      .select('id').single()
+  const openAdd = (rel: Rel) => {
+    if (rel === 'sibling' && !rels.some((r) => r.type === 'parent_of' && r.b_id === sel)) {
+      alert('Tambahkan orang tua dulu, agar saudara bisa dihubungkan.'); return
+    }
+    setForm({ mode: 'add', rel })
+  }
+
+  const save = async (v: PersonValues) => {
+    if (!treeId || !form) return
+    if (form.mode === 'edit') {
+      if (!selected) return
+      const r = await supabase.from('persons').update(v).eq('id', selected.id)
+      if (r.error) { setMsg(r.error.message); return }
+      setForm(null)
+      await load(treeId)
+      return
+    }
+    const rel = form.rel
+    const p = await supabase.from('persons').insert({ tree_id: treeId, ...v }).select('id').single()
     if (p.error) { setMsg(p.error.message); return }
     const n = p.data.id as string
     let rows: { type: string; a_id: string; b_id: string }[] = []
@@ -91,26 +112,28 @@ function Main() {
       if (rel === 'parent') rows = [{ type: 'parent_of', a_id: n, b_id: sel }]
       if (rel === 'child') rows = [{ type: 'parent_of', a_id: sel, b_id: n }]
       if (rel === 'partner') rows = [{ type: 'partner_of', a_id: sel, b_id: n }]
-      if (rel === 'sibling') rows = parents.map((r) => ({ type: 'parent_of', a_id: r.a_id, b_id: n }))
+      if (rel === 'sibling')
+        rows = rels.filter((r) => r.type === 'parent_of' && r.b_id === sel).map((r) => ({ type: 'parent_of', a_id: r.a_id, b_id: n }))
     }
     if (rows.length) {
       const r = await supabase.from('relations').insert(rows.map((x) => ({ ...x, tree_id: treeId })))
       if (r.error) setMsg(r.error.message)
     }
+    if (rel === 'first') {
+      const r = await supabase.from('trees').update({ root_person_id: n }).eq('id', treeId)
+      if (r.error) setMsg(r.error.message)
+    }
+    setForm(null)
     await load(treeId)
     setSel(n)
   }
 
-  const edit = async () => {
+  const makeRoot = async () => {
     if (!selected || !treeId) return
-    const full_name = prompt('Nama lengkap:', selected.full_name)
-    if (!full_name) return
-    const birth = prompt('Tanggal lahir (YYYY-MM-DD, boleh kosong):', selected.birth_date ?? '')
-    const death = prompt('Tanggal wafat (YYYY-MM-DD, boleh kosong):', selected.death_date ?? '')
-    const r = await supabase.from('persons')
-      .update({ full_name, birth_date: birth || null, death_date: death || null }).eq('id', selected.id)
-    if (r.error) setMsg(r.error.message)
-    await load(treeId)
+    const r = await supabase.from('trees').update({ root_person_id: selected.id }).eq('id', treeId)
+    if (r.error) { setMsg(r.error.message); return }
+    setRootId(selected.id)
+    setRecenter((k) => k + 1)
   }
 
   const remove = async () => {
@@ -123,7 +146,7 @@ function Main() {
   }
 
   const exportJson = () => {
-    const blob = new Blob([JSON.stringify({ version: 1, persons, relations: rels }, null, 2)], { type: 'application/json' })
+    const blob = new Blob([JSON.stringify({ version: 2, root_person_id: rootId, persons, relations: rels }, null, 2)], { type: 'application/json' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
     a.download = 'silsilah.json'
@@ -138,7 +161,8 @@ function Main() {
       const ps = (d.persons as Person[]).map((p) => {
         const id = crypto.randomUUID()
         map.set(p.id, id)
-        return { id, tree_id: treeId, full_name: p.full_name, gender: p.gender, birth_date: p.birth_date, death_date: p.death_date, notes: p.notes }
+        return { id, tree_id: treeId, full_name: p.full_name, gender: p.gender, birth_date: p.birth_date,
+          death_date: p.death_date, address: p.address ?? null, phone: p.phone ?? null, photo: p.photo ?? null, notes: p.notes }
       })
       const rs = (d.relations as Relation[]).filter((r) => map.has(r.a_id) && map.has(r.b_id))
         .map((r) => ({ tree_id: treeId, type: r.type, a_id: map.get(r.a_id)!, b_id: map.get(r.b_id)! }))
@@ -155,28 +179,44 @@ function Main() {
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', fontFamily: 'sans-serif' }}>
       <header style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: 8, alignItems: 'center', borderBottom: '1px solid #ddd' }}>
         <b style={{ marginRight: 'auto' }}>Silsilah Keluarga</b>
+        <button style={btn} onClick={() => setRecenter((k) => k + 1)}>⌖ Pusatkan</button>
         <button style={btn} onClick={exportJson}>Ekspor</button>
         <label style={{ ...btn, border: '1px solid #888', borderRadius: 4, cursor: 'pointer' }}>
           Impor<input type="file" accept=".json" hidden onChange={(e) => e.target.files?.[0] && importJson(e.target.files[0])} />
         </label>
         <button style={btn} onClick={() => supabase.auth.signOut()}>Keluar</button>
       </header>
-      {msg && <div style={{ background: '#fee', color: '#900', padding: 6 }} onClick={() => setMsg('')}>{msg}</div>}
+      {msg && <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, background: '#fee', color: '#900', padding: 8 }} onClick={() => setMsg('')}>{msg} (ketuk untuk menutup)</div>}
       <div style={{ flex: 1, position: 'relative' }}>
         {persons.length === 0 && treeId
-          ? <div style={{ padding: 30 }}><button style={btn} onClick={() => addPerson('first')}>+ Tambah orang pertama</button></div>
-          : <TreeView persons={persons} rels={rels} sel={sel} onSelect={setSel} />}
+          ? <div style={{ padding: 30 }}><button style={btn} onClick={() => setForm({ mode: 'add', rel: 'first' })}>+ Tambah orang pertama (Saya)</button></div>
+          : <TreeView persons={persons} rels={rels} rootId={rootId} sel={sel} onSelect={setSel} recenterKey={recenter} />}
       </div>
       {selected && (
-        <footer style={{ padding: 8, borderTop: '1px solid #ddd', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-          <b style={{ marginRight: 'auto' }}>{selected.full_name}</b>
-          <button style={btn} onClick={() => addPerson('parent')}>↑ Orang tua</button>
-          <button style={btn} onClick={() => addPerson('child')}>↓ Anak</button>
-          <button style={btn} onClick={() => addPerson('partner')}>↔ Pasangan</button>
-          <button style={btn} onClick={() => addPerson('sibling')}>⇆ Saudara</button>
-          <button style={btn} onClick={edit}>Ubah</button>
-          <button style={{ ...btn, color: '#b00' }} onClick={remove}>Hapus</button>
+        <footer style={{ padding: 8, borderTop: '1px solid #ddd', display: 'grid', gap: 6, maxHeight: '38dvh', overflow: 'auto' }}>
+          <div>
+            <b>{selected.full_name}</b>
+            {selected.address && <div style={{ fontSize: 13 }}>📍 {selected.address}</div>}
+            {selected.phone && <div style={{ fontSize: 13 }}>📞 <a href={`tel:${selected.phone}`}>{selected.phone}</a></div>}
+            {selected.notes && <div style={{ fontSize: 13, color: '#555' }}>📝 {selected.notes}</div>}
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button style={btn} onClick={() => openAdd('parent')}>↑ Orang tua</button>
+            <button style={btn} onClick={() => openAdd('child')}>↓ Anak</button>
+            <button style={btn} onClick={() => openAdd('partner')}>↔ Pasangan</button>
+            <button style={btn} onClick={() => openAdd('sibling')}>⇆ Saudara</button>
+            <button style={btn} onClick={() => setForm({ mode: 'edit' })}>Ubah</button>
+            {selected.id !== rootId && <button style={btn} onClick={makeRoot}>⭐ Jadikan pusat (Saya)</button>}
+            <button style={{ ...btn, color: '#b00' }} onClick={remove}>Hapus</button>
+          </div>
         </footer>
+      )}
+      {form && (
+        <PersonForm
+          key={form.mode === 'edit' ? selected?.id : form.rel}
+          title={form.mode === 'edit' ? 'Ubah data' : TITLES[form.rel]}
+          initial={form.mode === 'edit' ? selected : undefined}
+          onSave={save} onCancel={() => setForm(null)} />
       )}
     </div>
   )

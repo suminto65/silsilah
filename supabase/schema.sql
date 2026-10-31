@@ -21,10 +21,17 @@ create table persons (
   birth_date date,
   death_date date,
   notes text,
+  address text,
+  phone text,
+  photo text,
+  created_at timestamptz not null default now(),
   created_by uuid default auth.uid(),
   updated_by uuid default auth.uid(),
   updated_at timestamptz not null default now()
 );
+
+-- Titik pusat tampilan ("Saya")
+alter table trees add column root_person_id uuid references persons on delete set null;
 
 create table relations (
   id uuid primary key default gen_random_uuid(),

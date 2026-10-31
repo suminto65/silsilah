@@ -18,3 +18,8 @@ Vite + React + TypeScript + React Flow + Supabase. Deploy: GitHub → Vercel.
 ## Cara pakai
 Klik kartu orang, lalu pakai tombol di bawah: ↑ Orang tua, ↓ Anak, ↔ Pasangan, ⇆ Saudara, Ubah, Hapus.
 Ekspor/Impor JSON ada di bagian atas.
+
+## Pembaruan: formulir lengkap dan posisi "Saya" di tengah
+Untuk database yang sudah berjalan, jalankan **sekali** `supabase/migrasi-02-form-lengkap.sql` di SQL Editor
+(menambah kolom alamat, no. HP, foto, dan titik pusat). Instalasi baru cukup memakai `schema.sql`.
+Lalu salin berkas baru ke proyek, `git add .`, `git commit`, `git push` agar Vercel memperbarui situs.

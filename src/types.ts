@@ -5,7 +5,11 @@ export interface Person {
   gender: 'L' | 'P' | null
   birth_date: string | null
   death_date: string | null
+  address: string | null
+  phone: string | null
+  photo: string | null
   notes: string | null
+  created_at?: string
 }
 export interface Relation {
   id: string
