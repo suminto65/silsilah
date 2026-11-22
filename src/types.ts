@@ -18,3 +18,30 @@ export interface Relation {
   a_id: string
   b_id: string
 }
+
+export type Role = 'owner' | 'editor' | 'viewer'
+export interface Member {
+  tree_id: string
+  user_id: string
+  role: Role
+  person_id: string | null
+  email: string | null
+}
+export interface Invite {
+  id: string
+  token: string
+  role: 'editor' | 'viewer'
+  max_uses: number
+  uses: number
+  expires_at: string
+  revoked: boolean
+}
+export interface LogEntry {
+  id: number
+  user_email: string | null
+  action: 'INSERT' | 'UPDATE' | 'DELETE'
+  table_name: 'persons' | 'relations'
+  summary: string | null
+  created_at: string
+}
+export const ROLE_LABEL: Record<Role, string> = { owner: 'Pemilik', editor: 'Editor', viewer: 'Pembaca' }

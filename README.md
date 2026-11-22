@@ -23,3 +23,14 @@ Ekspor/Impor JSON ada di bagian atas.
 Untuk database yang sudah berjalan, jalankan **sekali** `supabase/migrasi-02-form-lengkap.sql` di SQL Editor
 (menambah kolom alamat, no. HP, foto, dan titik pusat). Instalasi baru cukup memakai `schema.sql`.
 Lalu salin berkas baru ke proyek, `git add .`, `git commit`, `git push` agar Vercel memperbarui situs.
+
+## Tahap 2: kolaborasi keluarga
+Jalankan **sekali** `supabase/migrasi-03-tahap2.sql` di SQL Editor (instalasi baru: `schema.sql` dulu, lalu berkas ini).
+Isinya: undangan, peran (Pemilik / Editor / Pembaca), kartu "Saya" per anggota, riwayat perubahan, pemulihan orang yang terhapus, dan pembaruan langsung.
+
+Cara memakai:
+1. Pemilik klik **Anggota**, pilih peran, klik **Buat tautan undangan**, lalu kirim lewat WhatsApp.
+2. Penerima membuka tautan, daftar/masuk, lalu klik **Gabung**.
+3. Penerima memilih kartunya sendiri, lalu klik **⭐ Jadikan pusat (Saya)**. Tampilan setiap anggota berpusat pada dirinya.
+4. **Riwayat** menampilkan siapa mengubah apa dan kapan. Orang yang terhapus bisa dipulihkan (tanpa foto).
+5. Di Supabase, matikan "Confirm email" selama batas pengiriman email bawaan masih kecil, atau atur SMTP sendiri sebelum banyak orang mendaftar.
