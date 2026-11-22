@@ -34,3 +34,8 @@ Cara memakai:
 3. Penerima memilih kartunya sendiri, lalu klik **⭐ Jadikan pusat (Saya)**. Tampilan setiap anggota berpusat pada dirinya.
 4. **Riwayat** menampilkan siapa mengubah apa dan kapan. Orang yang terhapus bisa dipulihkan (tanpa foto).
 5. Di Supabase, matikan "Confirm email" selama batas pengiriman email bawaan masih kecil, atau atur SMTP sendiri sebelum banyak orang mendaftar.
+
+## Cetak PDF
+Klik **Cetak PDF** di bagian atas, pilih ukuran kertas (A4/A3/A2) dan arah, lalu **Cetak / Simpan sebagai PDF**.
+Di jendela cetak pilih "Simpan sebagai PDF" dan matikan "Header dan footer". Hasilnya vektor (tajam, bisa diperbesar).
+Pohon yang dicetak berpusat pada kartu "Saya" milik pengguna yang mencetak.

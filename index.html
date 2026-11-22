@@ -7,7 +7,16 @@
     <title>Silsilah Keluarga</title>
   </head>
   <body>
+    <style>
+      #print-root { display: none; }
+      @media print {
+        #root { display: none !important; }
+        #print-root { display: block; overflow: hidden; }
+        body { margin: 0; }
+      }
+    </style>
     <div id="root"></div>
+    <div id="print-root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

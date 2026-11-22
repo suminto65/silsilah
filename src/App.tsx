@@ -5,6 +5,7 @@ import TreeView from './TreeView'
 import PersonForm, { type PersonValues } from './PersonForm'
 import MembersPanel from './MembersPanel'
 import HistoryPanel from './HistoryPanel'
+import PrintDialog from './PrintDialog'
 import { ROLE_LABEL, type Member, type Person, type Relation } from './types'
 
 const PENDING = 'pending_invite'
@@ -101,7 +102,7 @@ function Main({ userId }: { userId: string }) {
   const [rels, setRels] = useState<Relation[]>([])
   const [sel, setSel] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(null)
-  const [panel, setPanel] = useState<'members' | 'history' | null>(null)
+  const [panel, setPanel] = useState<'members' | 'history' | 'print' | null>(null)
   const [recenter, setRecenter] = useState(0)
   const [msg, setMsg] = useState('')
 
@@ -265,6 +266,7 @@ function Main({ userId }: { userId: string }) {
         <button style={btn} onClick={() => setRecenter((k) => k + 1)}>⌖ Pusatkan</button>
         <button style={btn} onClick={() => setPanel('members')}>Anggota</button>
         <button style={btn} onClick={() => setPanel('history')}>Riwayat</button>
+        <button style={btn} onClick={() => setPanel('print')} disabled={!persons.length}>Cetak PDF</button>
         <button style={btn} onClick={exportJson}>Ekspor</button>
         {canEdit && (
           <label style={{ ...btn, border: '1px solid #888', borderRadius: 4, cursor: 'pointer' }}>
@@ -324,6 +326,10 @@ function Main({ userId }: { userId: string }) {
       {panel === 'history' && treeId && (
         <HistoryPanel treeId={treeId} canEdit={canEdit} onClose={() => setPanel(null)}
           onRestored={() => load(treeId)} onError={setMsg} />
+      )}
+      {panel === 'print' && persons.length > 0 && (
+        <PrintDialog persons={persons} rels={rels} centerId={centerId}
+          treeName={trees.find((t) => t.id === treeId)?.name ?? 'Keluarga'} onClose={() => setPanel(null)} />
       )}
     </div>
   )
